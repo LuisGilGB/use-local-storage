@@ -1,73 +1,122 @@
-# React + TypeScript + Vite
+# useLocalStorageKey
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A React hook for syncing state with localStorage using React's `useSyncExternalStore`. This hook provides type-safe localStorage access with automatic synchronization across browser tabs and windows.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Type-safe**: Full TypeScript support with generic types
+- **Cross-tab sync**: Changes automatically sync across browser tabs/windows via Storage Events
+- **React 19 native**: Built on `useSyncExternalStore` for optimal React integration
+- **JSON serialization**: Automatic JSON parsing and stringification
+- **SSR compatible**: Includes server-side snapshot support
+- **Null handling**: Clean API for removing values from localStorage
 
-## React Compiler
+## Installation
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+This is a proof-of-concept project. To use the hook in your project, copy `src/use-local-storage-key.ts` to your codebase.
 
-## Expanding the ESLint configuration
+## Usage
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+```tsx
+import { useLocalStorageKey } from './use-local-storage-key'
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+const MyComponent = () => {
+  const [name, setName] = useLocalStorageKey<string>('user:name')
+  const [count, setCount] = useLocalStorageKey<number>('app:count')
+  const [enabled, setEnabled] = useLocalStorageKey<boolean>('feature:enabled')
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+  return (
+    <div>
+      <input 
+        value={name ?? ''} 
+        onChange={(e) => setName(e.target.value)} 
+      />
+      <button onClick={() => setCount((count ?? 0) + 1)}>
+        Count: {count ?? 0}
+      </button>
+      <button onClick={() => setName(null)}>Clear name</button>
+    </div>
+  )
+}
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## API
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### `useLocalStorageKey<T>(key: string): [T | null, (value: T | null) => void]`
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+#### Parameters
+
+- **key**: `string` - The localStorage key to sync with
+
+#### Returns
+
+A tuple containing:
+- **value**: `T | null` - The current value from localStorage (parsed from JSON)
+- **setter**: `(value: T | null) => void` - Function to update the value (pass `null` to remove)
+
+## How It Works
+
+1. **Subscription**: Uses `useSyncExternalStore` to subscribe to Storage Events
+2. **Custom wrapper**: Dispatches synthetic Storage Events for same-tab updates
+3. **JSON handling**: Automatically serializes/deserializes values
+4. **Error handling**: Catches and logs parsing/storage errors gracefully
+
+## Demo
+
+The included demo app showcases:
+- String storage with input field
+- Number storage with increment/decrement
+- Boolean storage with checkbox
+- Cross-tab synchronization
+
+### Running the Demo
+
+```bash
+# Install dependencies
+bun install
+
+# Start dev server
+bun run dev
+
+# Build for production
+bun run build
 ```
+
+Open the app in multiple browser tabs to see real-time synchronization.
+
+## Technical Details
+
+### Storage Event Wrapper
+
+The hook uses a custom `localStorageWrapper` that dispatches synthetic Storage Events for same-tab updates:
+
+```typescript
+const localStorageWrapper = {
+  setItem(key: string, value: string) {
+    localStorage.setItem(key, value)
+    window.dispatchEvent(new StorageEvent('storage', { key, newValue: value }))
+  },
+  // ...
+}
+```
+
+This ensures that `useSyncExternalStore` receives notifications for all changes, not just cross-tab updates.
+
+### SSR Support
+
+The hook provides a server snapshot that returns `null`, making it safe for server-side rendering:
+
+```typescript
+const getServerSnapshot = useCallback(() => null, [])
+```
+
+## Tech Stack
+
+- React 19.2
+- TypeScript 5.9
+- Vite 7.1
+- Bun (package manager)
+
+## License
+
+MIT
